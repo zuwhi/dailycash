@@ -1,1 +1,1 @@
-# Next.js starter kit 
+# Next.js 
