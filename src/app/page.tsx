@@ -1,9 +1,16 @@
+"use client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 
 export default function LandingPage() {
-  console.log("APPWRITE ENDPOINT:", process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT);
-  console.log("Project ID:", process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+  useEffect(() => {
+    console.log(
+      "APPWRITE ENDPOINT:",
+      process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
+    );
+    console.log("Project ID:", process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
@@ -13,7 +20,7 @@ export default function LandingPage() {
           Manage your daily expenses and income with ease
         </p>
         <Link href="/dashboard">
-          <Button size="lg">Get Started</Button>
+          <Button size="lg">Get Starlllted</Button>
         </Link>
       </div>
     </div>
