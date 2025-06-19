@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function LandingPage() {
-  console.log("Appwrite endpoint:", process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT);
+  console.log("APPWRITE ENDPOINT:", process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT);
   console.log("Project ID:", process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
 
   return (
