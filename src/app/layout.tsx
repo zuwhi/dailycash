@@ -35,11 +35,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
         className={`${inter.className} flex min-h-screen flex-col bg-[#FAFAFB] text-sm text-[#56565C]`}
       >
         {/* <Header /> */}
-        <main className="flex-grow pt-16">{children}</main>
+        <main className="flex-grow ">{children}</main>
         {/* <Footer /> */}
       </body>
-
-    
     </html>
   );
 }

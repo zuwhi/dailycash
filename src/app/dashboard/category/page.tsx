@@ -1,6 +1,5 @@
 "use client";
 
-
 import React, { useEffect, useState } from "react";
 import {
   databases,
@@ -23,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -142,120 +142,131 @@ export default function CategoryPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Category Management</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              onClick={() => {
-                setFormData({
-                  name: "",
-                  type: 1,
-                  icon: "tag",
-                  color: "#000000",
-                });
-              }}
-            >
-              Add Category
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {formData.$id ? "Edit Category" : "Add Category"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Type</Label>
-                <Select
-                  value={formData.type?.toString()}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, type: parseInt(value) })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Income</SelectItem>
-                    <SelectItem value="2">Expense</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="icon">Icon</Label>
-                <Select
-                  value={formData.icon}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, icon: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select icon" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {iconOptions.map((icon) => (
-                      <SelectItem key={icon.value} value={icon.value}>
-                        {icon.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="color">Color</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="color"
-                    id="color"
-                    value={formData.color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, color: e.target.value })
-                    }
-                    className="h-12 w-12 p-1"
-                  />
-                  <Input
-                    type="text"
-                    value={formData.color}
-                    onChange={(e) =>
-                      setFormData({ ...formData, color: e.target.value })
-                    }
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-              <Button type="submit" className="w-full">
-                {formData.$id ? "Update" : "Create"} Category
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+      <div className="mb-6">
+        <h1 className="mb-2 text-4xl font-extrabold tracking-tight text-blue-900">
+          Kelola Kategori
+        </h1>
+        <p className="text-lg text-gray-500">
+          Tambah, edit, dan kelola kategori transaksi Anda
+        </p>
       </div>
 
+      {/* <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <Button onClick={() => setIsDialogOpen(true)}>Tambah Kategori</Button>
+      </div> */}
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <Button
+            className="mb-4"
+            onClick={() => {
+              setFormData({
+                name: "",
+                type: 1,
+                icon: "tag",
+                color: "#000000",
+              });
+            }}
+          >
+            Tambah Kategori Baru
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {formData.$id ? "Edit Kategori" : "Tambah Kategori Baru"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Nama
+              </Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="col-span-3"
+                placeholder="Masukkan nama kategori"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="type" className="text-right">
+                Tipe
+              </Label>
+              <Select
+                value={formData.type?.toString()}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, type: parseInt(value) })
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Pilih tipe kategori" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Kredit</SelectItem>
+                  <SelectItem value="2">Debet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="icon" className="text-right">
+                Icon
+              </Label>
+              <Input
+                id="icon"
+                value={formData.icon}
+                onChange={(e) =>
+                  setFormData({ ...formData, icon: e.target.value })
+                }
+                className="col-span-3"
+                placeholder="Masukkan nama icon"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="color" className="text-right">
+                Warna
+              </Label>
+              <Input
+                id="color"
+                type="color"
+                value={formData.color}
+                onChange={(e) =>
+                  setFormData({ ...formData, color: e.target.value })
+                }
+                className="col-span-3"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button type="submit">
+                {formData.$id ? "Update" : "Simpan"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
-        <div>Loading...</div>
+        <div>Memuat...</div>
       ) : (
         <div className="rounded-lg border bg-white shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>Nama</TableHead>
+                <TableHead>Tipe</TableHead>
                 <TableHead>Icon</TableHead>
-                <TableHead>Color</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Warna</TableHead>
+                <TableHead>Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -263,7 +274,7 @@ export default function CategoryPage() {
                 <TableRow key={category.$id}>
                   <TableCell>{category.name}</TableCell>
                   <TableCell>
-                    {category.type === 1 ? "Income" : "Expense"}
+                    {category.type === 1 ? "Kredit" : "Debet"}
                   </TableCell>
                   <TableCell>
                     <i className={`fas fa-${category.icon}`}></i>

@@ -1,12 +1,12 @@
 "use client";
 
-
 import React, { useEffect, useState } from "react";
 import {
   databases,
   storage,
   DATABASE_ID,
   COLLECTION_TRANSACTION_ID,
+  COLLECTION_CATEGORY_ID,
   BUCKET_ID,
   Query,
 } from "@/lib/appwrite";
@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Transaction {
   $id: string;
@@ -54,12 +56,22 @@ interface Transaction {
   image: string;
 }
 
+interface Category {
+  $id: string;
+  name: string;
+  type: number;
+}
+
 export default function TransactionPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [filterType, setFilterType] = useState("all");
   const [formData, setFormData] = useState<Partial<Transaction>>({
     type: 1,
     date: format(new Date(), "yyyy-MM-dd"),
@@ -73,6 +85,36 @@ export default function TransactionPage() {
     },
     image: "",
   });
+
+  const formatDate = (dateString: string, formatString: string) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return "Tanggal tidak valid";
+      }
+      return format(date, formatString);
+    } catch (error) {
+      return "Tanggal tidak valid";
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await databases.listDocuments(
+        DATABASE_ID,
+        COLLECTION_CATEGORY_ID,
+      );
+      setCategories(
+        response.documents.map((doc) => ({
+          $id: doc.$id,
+          name: doc.name,
+          type: doc.type,
+        })),
+      );
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
 
   const fetchTransactions = async () => {
     try {
@@ -102,11 +144,70 @@ export default function TransactionPage() {
 
   useEffect(() => {
     fetchTransactions();
+    fetchCategories();
   }, []);
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (editId) {
+      const transaction = transactions.find((t) => t.$id === editId);
+      if (transaction) {
+        handleEdit(transaction);
+        // Clear the URL parameter
+        router.replace("/dashboard/cash");
+      }
+    }
+  }, [searchParams, transactions, router]);
+
+  const handleCategoryChange = (categoryId: string) => {
+    if (categoryId === "none") {
+      setFormData({
+        ...formData,
+        category: {
+          id: "",
+          name: "Uncategorized",
+        },
+      });
+    } else {
+      const selectedCategory = categories.find((cat) => cat.$id === categoryId);
+      setFormData({
+        ...formData,
+        category: {
+          id: categoryId,
+          name: selectedCategory?.name || "Uncategorized",
+        },
+      });
+    }
+  };
+
+  // Reset kategori ketika tipe transaksi berubah
+  useEffect(() => {
+    if (formData.type) {
+      setFormData((prev) => ({
+        ...prev,
+        category: {
+          id: "",
+          name: "Uncategorized",
+        },
+      }));
+    }
+  }, [formData.type]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validasi ukuran file (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Ukuran file terlalu besar. Maksimal 5MB.");
+        return;
+      }
+
+      // Validasi tipe file
+      if (!file.type.startsWith("image/")) {
+        alert("File harus berupa gambar.");
+        return;
+      }
+
       setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -118,13 +219,13 @@ export default function TransactionPage() {
 
   const uploadImage = async (file: File): Promise<string> => {
     try {
-      const response = await storage.createFile(BUCKET_ID, ID.unique(), file, [
-        "read('any')",
-      ]);
+      // Upload file tanpa permission khusus (menggunakan default bucket permissions)
+      const response = await storage.createFile(BUCKET_ID, ID.unique(), file);
+      console.log("Image uploaded successfully:", response.$id);
       return response.$id;
     } catch (error) {
       console.error("Error uploading image:", error);
-      throw error;
+      throw new Error("Gagal mengupload gambar. Silakan coba lagi.");
     }
   };
 
@@ -134,7 +235,15 @@ export default function TransactionPage() {
       let imageId = formData.image;
 
       if (selectedFile) {
-        imageId = await uploadImage(selectedFile);
+        try {
+          imageId = await uploadImage(selectedFile);
+        } catch (uploadError) {
+          console.error("Upload error:", uploadError);
+          alert(
+            "Gagal mengupload gambar. Transaksi akan disimpan tanpa gambar.",
+          );
+          imageId = ""; // Reset image ID jika upload gagal
+        }
       }
 
       const transactionData = {
@@ -149,8 +258,6 @@ export default function TransactionPage() {
         date: new Date(),
         updated_at: new Date().toISOString(),
       };
-
-      console.log(transactionData);
 
       if (formData.$id) {
         await databases.updateDocument(
@@ -169,13 +276,30 @@ export default function TransactionPage() {
       }
       setIsDialogOpen(false);
       fetchTransactions();
+      // Reset form
+      setFormData({
+        type: 1,
+        date: format(new Date(), "yyyy-MM-dd"),
+        datetime: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        title: "",
+        desc: "",
+        amount: 0,
+        category: {
+          id: "",
+          name: "Uncategorized",
+        },
+        image: "",
+      });
+      setImagePreview("");
+      setSelectedFile(null);
     } catch (error) {
       console.error("Error saving transaction:", error);
+      alert("Gagal menyimpan transaksi. Silakan coba lagi.");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this transaction?")) {
+    if (window.confirm("Apakah Anda yakin ingin menghapus transaksi ini?")) {
       try {
         await databases.deleteDocument(
           DATABASE_ID,
@@ -190,208 +314,324 @@ export default function TransactionPage() {
   };
 
   const handleEdit = (transaction: Transaction) => {
-    setFormData(transaction);
-    setImagePreview(transaction.image);
+    setFormData({
+      ...transaction,
+      category: {
+        id: transaction.category?.id || "",
+        name: transaction.category?.name || "Uncategorized",
+      },
+    });
+    if (transaction.image) {
+      setImagePreview(getImageUrl(transaction.image));
+    } else {
+      setImagePreview("");
+    }
     setIsDialogOpen(true);
+  };
+
+  const handleRemoveImage = () => {
+    setImagePreview("");
+    setSelectedFile(null);
+    setFormData({ ...formData, image: "" });
+  };
+
+  const handleView = (transaction: Transaction) => {
+    router.push(`/dashboard/cash/${transaction.$id}`);
   };
 
   const getImageUrl = (fileId: string) => {
     return `${process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID}`;
   };
 
+  const filteredTransactions = transactions.filter((transaction) => {
+    if (filterType === "all") return true;
+    return transaction.type.toString() === filterType;
+  });
+
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Transaction Management</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
+      <div className="mb-6">
+        <h1 className="mb-2 text-4xl font-extrabold tracking-tight text-blue-900">
+          Kelola Transaksi
+        </h1>
+        <p className="text-lg text-gray-500">
+          Tambah, edit, dan kelola transaksi keuangan Anda
+        </p>
+      </div>
+
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <Button onClick={() => setIsDialogOpen(true)}>
+            Tambah Transaksi
+          </Button>
+          <div className="flex gap-2">
             <Button
-              onClick={() => {
-                setFormData({
-                  type: 1,
-                  date: format(new Date(), "yyyy-MM-dd"),
-                  datetime: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
-                  title: "",
-                  desc: "",
-                  amount: 0,
-                  category: {
-                    id: "",
-                    name: "Uncategorized",
-                  },
-                  image: "",
-                });
-                setImagePreview("");
-                setSelectedFile(null);
-              }}
+              variant={filterType === "all" ? "default" : "outline"}
+              onClick={() => setFilterType("all")}
             >
-              Add Transaction
+              Semua
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {formData.$id ? "Edit Transaction" : "Add Transaction"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type</Label>
-                  <Select
-                    value={formData.type?.toString()}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, type: parseInt(value) })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Income</SelectItem>
-                      <SelectItem value="2">Expense</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date">Date</Label>
-                  <Input
-                    type="date"
-                    id="date"
-                    value={formData.date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, date: e.target.value })
-                    }
-                  />
-                </div>
+            <Button
+              variant={filterType === "1" ? "default" : "outline"}
+              onClick={() => setFilterType("1")}
+            >
+              Kredit
+            </Button>
+            <Button
+              variant={filterType === "2" ? "default" : "outline"}
+              onClick={() => setFilterType("2")}
+            >
+              Debet
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {formData.$id ? "Edit Transaksi" : "Tambah Transaksi Baru"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="type" className="text-right">
+                  Tipe
+                </Label>
+                <Select
+                  value={formData.type?.toString()}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, type: parseInt(value) })
+                  }
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Pilih tipe transaksi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Kredit</SelectItem>
+                    <SelectItem value="2">Debet</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="title" className="text-right">
+                  Judul
+                </Label>
                 <Input
                   id="title"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
+                  className="col-span-3"
+                  placeholder="Masukkan judul transaksi"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="desc">Description</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="desc" className="text-right">
+                  Deskripsi
+                </Label>
                 <Input
                   id="desc"
                   value={formData.desc}
                   onChange={(e) =>
                     setFormData({ ...formData, desc: e.target.value })
                   }
+                  className="col-span-3"
+                  placeholder="Masukkan deskripsi transaksi"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="amount" className="text-right">
+                  Jumlah
+                </Label>
                 <Input
-                  type="number"
                   id="amount"
+                  type="number"
                   value={formData.amount}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      amount: parseFloat(e.target.value),
+                      amount: parseFloat(e.target.value) || 0,
                     })
                   }
+                  className="col-span-3"
+                  placeholder="Masukkan jumlah"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Tanggal
+                </Label>
                 <Input
-                  id="category"
-                  value={formData.category?.name}
+                  id="date"
+                  type="date"
+                  value={formData.date}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      category: { ...formData.category!, name: e.target.value },
-                    })
+                    setFormData({ ...formData, date: e.target.value })
                   }
+                  className="col-span-3"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="image">Image</Label>
-                <Input
-                  type="file"
-                  id="image"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                />
-                {imagePreview && (
-                  <div className="mt-2">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">
+                  Kategori
+                </Label>
+                <Select
+                  value={formData.category?.id || "none"}
+                  onValueChange={handleCategoryChange}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Tanpa Kategori</SelectItem>
+                    {categories
+                      .filter(
+                        (cat) => cat.type === formData.type || cat.type === 0,
+                      )
+                      .map((category) => (
+                        <SelectItem key={category.$id} value={category.$id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="image" className="text-right">
+                  Gambar
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="col-span-3"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Format: JPG, PNG, GIF. Maksimal 5MB.
+                  </p>
+                </div>
+              </div>
+              {imagePreview && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Preview</Label>
+                  <div className="relative col-span-3">
                     <Image
                       src={imagePreview}
                       alt="Preview"
                       width={200}
                       height={200}
                       className="rounded-lg object-cover"
+                      unoptimized
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+                    >
+                      ✕
+                    </Button>
                   </div>
-                )}
-              </div>
-              <Button type="submit" className="w-full">
-                {formData.$id ? "Update" : "Create"} Transaction
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Batal
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+              <Button type="submit">
+                {formData.$id ? "Update" : "Simpan"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {isLoading ? (
-        <div>Loading...</div>
+        <div>Memuat...</div>
       ) : (
         <div className="rounded-lg border bg-white shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Image</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Tipe</TableHead>
+                <TableHead>Judul</TableHead>
+                <TableHead>Deskripsi</TableHead>
+                <TableHead>Jumlah</TableHead>
+                <TableHead>Kategori</TableHead>
+                <TableHead>Gambar</TableHead>
+                <TableHead>Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((transaction) => (
+              {filteredTransactions.map((transaction) => (
                 <TableRow key={transaction.$id}>
                   <TableCell>
-                    {transaction.date
-                      ? format(new Date(transaction.date), "dd/MM/yyyy")
-                      : "-"}
+                    {formatDate(transaction.date, "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>
-                    {transaction.type === 1 ? "Income" : "Expense"}
+                    {transaction.type === 1 ? "Kredit" : "Debet"}
                   </TableCell>
                   <TableCell>{transaction.title}</TableCell>
                   <TableCell>{transaction.desc}</TableCell>
                   <TableCell
                     className={
-                      transaction.type === 1 ? "text-green-600" : "text-red-600"
+                      transaction.type === 1
+                        ? "font-medium text-green-600"
+                        : "font-medium text-red-600"
                     }
                   >
-                    {transaction.type === 1 ? "+" : "-"} Rp {transaction.amount}
+                    Rp {transaction.amount.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    {transaction.category?.name ?? "Uncategorized"}
+                    {(() => {
+                      const category = categories.find(
+                        (cat) => cat.$id === transaction.category?.id,
+                      );
+                      return (
+                        category?.name ||
+                        transaction.category?.name ||
+                        "Uncategorized"
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     {transaction.image && (
                       <Image
                         src={getImageUrl(transaction.image)}
-                        alt={transaction.title}
+                        alt="Transaction"
                         width={50}
                         height={50}
-                        className="rounded-lg object-cover"
+                        className="rounded object-cover"
+                        unoptimized
+                        onError={(e) => {
+                          // Hide image if it fails to load
+                          e.currentTarget.style.display = "none";
+                        }}
                       />
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex space-x-2">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleView(transaction)}
+                      >
+                        View
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -400,11 +640,11 @@ export default function TransactionPage() {
                         Edit
                       </Button>
                       <Button
-                        variant="destructive"
+                        variant="outline"
                         size="sm"
                         onClick={() => handleDelete(transaction.$id)}
                       >
-                        Delete
+                        Hapus
                       </Button>
                     </div>
                   </TableCell>

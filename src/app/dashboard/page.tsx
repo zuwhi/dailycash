@@ -6,6 +6,7 @@ import {
   DATABASE_ID,
   COLLECTION_TRANSACTION_ID,
   Query,
+  account,
 } from "@/lib/appwrite";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import {
@@ -21,6 +22,7 @@ import {
   DonutChart,
   LineChart,
 } from "@tremor/react";
+import { useRouter } from "next/navigation";
 
 interface Transaction {
   $id: string;
@@ -41,16 +43,17 @@ interface CategorySummary {
 
 interface MonthlySummary {
   month: string;
-  income: number;
-  expense: number;
+  kredit: number;
+  debet: number;
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalBalance, setTotalBalance] = useState(0);
-  const [totalIncome, setTotalIncome] = useState(0);
-  const [totalExpense, setTotalExpense] = useState(0);
+  const [totalKredit, setTotalKredit] = useState(0);
+  const [totalDebet, setTotalDebet] = useState(0);
   const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary[]>([]);
 
@@ -81,16 +84,16 @@ export default function DashboardPage() {
       setTransactions(fetchedTransactions);
 
       // Calculate totals
-      const income = fetchedTransactions
+      const kredit = fetchedTransactions
         .filter((t) => t.type === 1)
         .reduce((sum, t) => sum + t.amount, 0);
-      const expense = fetchedTransactions
+      const debet = fetchedTransactions
         .filter((t) => t.type === 2)
         .reduce((sum, t) => sum + t.amount, 0);
 
-      setTotalIncome(income);
-      setTotalExpense(expense);
-      setTotalBalance(income - expense);
+      setTotalKredit(kredit);
+      setTotalDebet(debet);
+      setTotalBalance(kredit - debet);
 
       // Calculate category summary
       const categoryMap = new Map<string, number>();
@@ -112,14 +115,14 @@ export default function DashboardPage() {
       setCategorySummary(categoryData);
 
       // Calculate monthly summary
-      const monthlyMap = new Map<string, { income: number; expense: number }>();
+      const monthlyMap = new Map<string, { kredit: number; debet: number }>();
       fetchedTransactions.forEach((t) => {
         const month = format(new Date(t.date), "MMM yyyy");
-        const current = monthlyMap.get(month) ?? { income: 0, expense: 0 };
+        const current = monthlyMap.get(month) ?? { kredit: 0, debet: 0 };
         if (t.type === 1) {
-          current.income += t.amount;
+          current.kredit += t.amount;
         } else {
-          current.expense += t.amount;
+          current.debet += t.amount;
         }
         monthlyMap.set(month, current);
       });
@@ -127,8 +130,8 @@ export default function DashboardPage() {
       const monthlyData = Array.from(monthlyMap.entries())
         .map(([month, data]) => ({
           month,
-          income: data.income,
-          expense: data.expense,
+          kredit: data.kredit,
+          debet: data.debet,
         }))
         .sort((a, b) => {
           const dateA = new Date(a.month);
@@ -145,6 +148,18 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    const checkSession = async () => {
+      try {
+        await account.getSession("current");
+        // Session OK
+      } catch {
+        router.replace("/auth/login");
+      }
+    };
+    checkSession();
+  }, [router]);
+
+  useEffect(() => {
     fetchTransactions();
   }, []);
 
@@ -153,53 +168,61 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+    <div className="space-y-8">
+      <div className="mb-6">
+        <h1 className="mb-2 text-4xl font-extrabold tracking-tight text-blue-900">
+          Dashboard
+        </h1>
+        <p className="text-lg text-gray-500">
+          Ringkasan keuangan dan aktivitas Anda
+        </p>
+      </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <Title>Total Balance</Title>
-          <Text className="mt-2 text-3xl font-bold">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-col items-start rounded-xl border border-blue-100 bg-white/90 p-6 shadow-md">
+          <span className="mb-1 text-sm text-gray-400">Saldo Total</span>
+          <span className="text-2xl font-bold text-blue-800">
             Rp {totalBalance.toLocaleString()}
-          </Text>
-        </Card>
-        <Card>
-          <Title>Income</Title>
-          <Text className="mt-2 text-3xl font-bold text-green-600">
-            Rp {totalIncome.toLocaleString()}
-          </Text>
-        </Card>
-        <Card>
-          <Title>Expense</Title>
-          <Text className="mt-2 text-3xl font-bold text-red-600">
-            Rp {totalExpense.toLocaleString()}
-          </Text>
-        </Card>
-        <Card>
-          <Title>Transactions</Title>
-          <Text className="mt-2 text-3xl font-bold">{transactions.length}</Text>
-        </Card>
+          </span>
+        </div>
+        <div className="flex flex-col items-start rounded-xl border border-green-100 bg-white/90 p-6 shadow-md">
+          <span className="mb-1 text-sm text-gray-400">Kredit</span>
+          <span className="text-2xl font-bold text-green-600">
+            Rp {totalKredit.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex flex-col items-start rounded-xl border border-red-100 bg-white/90 p-6 shadow-md">
+          <span className="mb-1 text-sm text-gray-400">Debet</span>
+          <span className="text-2xl font-bold text-red-600">
+            Rp {totalDebet.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex flex-col items-start rounded-xl border border-gray-100 bg-white/90 p-6 shadow-md">
+          <span className="mb-1 text-sm text-gray-400">Transaksi</span>
+          <span className="text-2xl font-bold text-gray-700">
+            {transactions.length}
+          </span>
+        </div>
       </div>
 
       <TabGroup>
         <TabList className="mt-8">
-          <Tab>Overview</Tab>
-          <Tab>Categories</Tab>
-          <Tab>Monthly</Tab>
+          <Tab>Ringkasan</Tab>
+          <Tab>Kategori</Tab>
+          <Tab>Bulanan</Tab>
         </TabList>
         <TabPanels>
           <TabPanel>
             <div className="mt-6">
               <Card>
-                <Title>Income vs Expense (Last 6 Months)</Title>
+                <Title>Kredit vs Debet (6 Bulan Terakhir)</Title>
                 <BarChart
                   className="mt-6 h-72"
                   data={monthlySummary}
                   index="month"
-                  categories={["income", "expense"]}
+                  categories={["kredit", "debet"]}
                   colors={["green", "red"]}
                   valueFormatter={(number) => `Rp ${number.toLocaleString()}`}
-                  yAxisWidth={48}
                 />
               </Card>
             </div>
@@ -207,14 +230,13 @@ export default function DashboardPage() {
           <TabPanel>
             <div className="mt-6">
               <Card>
-                <Title>Category Distribution</Title>
+                <Title>Ringkasan Kategori</Title>
                 <DonutChart
                   className="mt-6 h-72"
                   data={categorySummary}
                   category="amount"
                   index="name"
                   valueFormatter={(number) => `Rp ${number.toLocaleString()}`}
-                  colors={["blue", "cyan", "indigo", "violet", "fuchsia"]}
                 />
               </Card>
             </div>
@@ -222,15 +244,14 @@ export default function DashboardPage() {
           <TabPanel>
             <div className="mt-6">
               <Card>
-                <Title>Monthly Trend</Title>
+                <Title>Tren Kredit vs Debet</Title>
                 <LineChart
                   className="mt-6 h-72"
                   data={monthlySummary}
                   index="month"
-                  categories={["income", "expense"]}
+                  categories={["kredit", "debet"]}
                   colors={["green", "red"]}
                   valueFormatter={(number) => `Rp ${number.toLocaleString()}`}
-                  yAxisWidth={48}
                 />
               </Card>
             </div>

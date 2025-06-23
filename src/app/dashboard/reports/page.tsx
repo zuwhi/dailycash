@@ -120,7 +120,7 @@ export default function ReportsPage() {
     const data = transactions.map((transaction) => ({
       ID: transaction.$id,
       Date: format(new Date(transaction.date), "yyyy-MM-dd"),
-      Type: transaction.type === 1 ? "Income" : "Expense",
+      Type: transaction.type === 1 ? "Kredit" : "Debet",
       Title: transaction.title,
       Description: transaction.desc,
       Amount: transaction.amount,
@@ -202,7 +202,7 @@ export default function ReportsPage() {
           // Prepare transaction data
           const transactionData = {
             date: new Date(transaction.Date),
-            type: transaction.Type === "Income" ? 1 : 2,
+            type: transaction.Type === "Kredit" ? 1 : 2,
             title: transaction.Title,
             desc: transaction.Description || "",
             amount: Number(transaction.Amount),
@@ -262,107 +262,85 @@ export default function ReportsPage() {
     }
   };
 
-  const totalIncome = transactions
+  const totalKredit = transactions
     .filter((t) => t.type === 1)
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalExpense = transactions
+  const totalDebet = transactions
     .filter((t) => t.type === 2)
     .reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Transaction Reports</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select month" />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((month) => (
-                  <SelectItem key={month.value} value={month.value}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue placeholder="Select year" />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((year) => (
-                  <SelectItem key={year.value} value={year.value}>
-                    {year.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={exportToExcel}>Export to Excel</Button>
-            <div className="relative">
-              <input
-                type="file"
-                accept=".xlsx"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="excel-upload"
-                disabled={isImporting}
-              />
-              <Button
-                onClick={() => document.getElementById("excel-upload")?.click()}
-                disabled={isImporting}
-              >
-                {isImporting ? "Importing..." : "Import from Excel"}
-              </Button>
-            </div>
+      <div className="mb-6">
+        <h1 className="mb-2 text-4xl font-extrabold tracking-tight text-blue-900">
+          Laporan Keuangan
+        </h1>
+        <p className="text-lg text-gray-500">
+          Analisis dan laporan keuangan Anda
+        </p>
+      </div>
+
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2">
+          <Button onClick={exportToExcel}>Export ke Excel</Button>
+          <div className="relative">
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="excel-upload"
+              disabled={isImporting}
+            />
+            <Button
+              onClick={() => document.getElementById("excel-upload")?.click()}
+              disabled={isImporting}
+            >
+              {isImporting ? "Mengimpor..." : "Import dari Excel"}
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500">Total Income</h3>
+          <h3 className="text-sm font-medium text-gray-500">Total Kredit</h3>
           <p className="mt-2 text-2xl font-bold text-green-600">
-            Rp {totalIncome.toLocaleString()}
+            Rp {totalKredit.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500">Total Expense</h3>
+          <h3 className="text-sm font-medium text-gray-500">Total Debet</h3>
           <p className="mt-2 text-2xl font-bold text-red-600">
-            Rp {totalExpense.toLocaleString()}
+            Rp {totalDebet.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500">Net Balance</h3>
+          <h3 className="text-sm font-medium text-gray-500">Saldo</h3>
           <p
             className={`mt-2 text-2xl font-bold ${
-              totalIncome - totalExpense >= 0
-                ? "text-green-600"
-                : "text-red-600"
+              totalKredit - totalDebet >= 0 ? "text-green-600" : "text-red-600"
             }`}
           >
-            Rp {(totalIncome - totalExpense).toLocaleString()}
+            Rp {(totalKredit - totalDebet).toLocaleString()}
           </p>
         </div>
       </div>
 
       {isLoading ? (
-        <div>Loading...</div>
+        <div>Memuat...</div>
       ) : (
         <div className="rounded-lg border bg-white shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Tipe</TableHead>
+                <TableHead>Judul</TableHead>
+                <TableHead>Deskripsi</TableHead>
+                <TableHead>Jumlah</TableHead>
+                <TableHead>Kategori</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -372,7 +350,7 @@ export default function ReportsPage() {
                     {format(new Date(transaction.date), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>
-                    {transaction.type === 1 ? "Income" : "Expense"}
+                    {transaction.type === 1 ? "Kredit" : "Debet"}
                   </TableCell>
                   <TableCell>{transaction.title}</TableCell>
                   <TableCell>{transaction.desc}</TableCell>
