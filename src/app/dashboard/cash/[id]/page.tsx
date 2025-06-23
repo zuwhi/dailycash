@@ -20,6 +20,9 @@ import {
   FileText,
 } from "lucide-react";
 
+// Disable static generation for this page
+export const dynamic = "force-dynamic";
+
 interface Transaction {
   $id: string;
   date: string;

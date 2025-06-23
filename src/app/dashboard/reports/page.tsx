@@ -28,6 +28,9 @@ import { format, startOfMonth, endOfMonth, parse } from "date-fns";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
+// Disable static generation for this page
+export const dynamic = "force-dynamic";
+
 interface Transaction {
   $id: string;
   date: string;

@@ -34,6 +34,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Disable static generation for this page
+export const dynamic = "force-dynamic";
+
 interface Category {
   $id: string;
   name: string;

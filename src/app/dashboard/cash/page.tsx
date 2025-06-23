@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import {
   databases,
   storage,
@@ -41,6 +41,9 @@ import { format } from "date-fns";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
+// Disable static generation for this page
+export const dynamic = "force-dynamic";
+
 interface Transaction {
   $id: string;
   date: string;
@@ -62,7 +65,7 @@ interface Category {
   type: number;
 }
 
-export default function TransactionPage() {
+function TransactionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -655,5 +658,22 @@ export default function TransactionPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TransactionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+            <p className="text-gray-600">Memuat halaman transaksi...</p>
+          </div>
+        </div>
+      }
+    >
+      <TransactionPageContent />
+    </Suspense>
   );
 }

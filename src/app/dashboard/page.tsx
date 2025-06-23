@@ -24,6 +24,9 @@ import {
 } from "@tremor/react";
 import { useRouter } from "next/navigation";
 
+// Disable static generation for this page
+export const dynamic = "force-dynamic";
+
 interface Transaction {
   $id: string;
   date: string;
