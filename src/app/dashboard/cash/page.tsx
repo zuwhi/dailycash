@@ -44,6 +44,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 // Disable static generation for this page
 export const dynamic = "force-dynamic";
 
+interface Category {
+  $id: string;
+  name: string;
+  type: number;
+  icon?: string | null;
+  color?: string | null;
+  // ...field lain dari response jika perlu
+}
+
 interface Transaction {
   $id: string;
   date: string;
@@ -52,17 +61,17 @@ interface Transaction {
   title: string;
   desc: string;
   amount: number;
+  category: Category; // sekarang object, bukan string
+  image: string;
+  // ...field lain dari response jika perlu
+}
+
+// Untuk form, gunakan tipe khusus agar category adalah object {id, name}
+interface TransactionFormData extends Omit<Partial<Transaction>, "category"> {
   category: {
     id: string;
     name: string;
   };
-  image: string;
-}
-
-interface Category {
-  $id: string;
-  name: string;
-  type: number;
 }
 
 function TransactionPageContent() {
@@ -75,7 +84,7 @@ function TransactionPageContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [filterType, setFilterType] = useState("all");
-  const [formData, setFormData] = useState<Partial<Transaction>>({
+  const [formData, setFormData] = useState<TransactionFormData>({
     type: 1,
     date: format(new Date(), "yyyy-MM-dd"),
     datetime: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
@@ -125,6 +134,9 @@ function TransactionPageContent() {
         DATABASE_ID,
         COLLECTION_TRANSACTION_ID,
       );
+
+      console.log(JSON.stringify(response, null, 2));
+
       setTransactions(
         response.documents.map((doc) => ({
           $id: doc.$id,
@@ -134,7 +146,7 @@ function TransactionPageContent() {
           title: doc.title,
           desc: doc.desc,
           amount: doc.amount,
-          category: doc.category,
+          category: doc.category, // sudah object
           image: doc.image,
         })),
       );
@@ -254,9 +266,7 @@ function TransactionPageContent() {
         title: formData.title,
         desc: formData.desc,
         amount: formData.amount,
-        category: {
-          name: formData.category?.name || "Uncategorized",
-        },
+        category: formData.category?.id || "", // hanya kirimkan $id kategori
         image: imageId,
         date: new Date(),
         updated_at: new Date().toISOString(),
@@ -320,7 +330,7 @@ function TransactionPageContent() {
     setFormData({
       ...transaction,
       category: {
-        id: transaction.category?.id || "",
+        id: transaction.category?.$id || "",
         name: transaction.category?.name || "Uncategorized",
       },
     });
@@ -363,11 +373,8 @@ function TransactionPageContent() {
       </div>
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <Button onClick={() => setIsDialogOpen(true)}>
-            Tambah Transaksi
-          </Button>
-          <div className="flex gap-2">
+        <div className="flex w-full flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="order-2 flex gap-2 sm:order-1">
             <Button
               variant={filterType === "all" ? "default" : "outline"}
               onClick={() => setFilterType("all")}
@@ -387,6 +394,13 @@ function TransactionPageContent() {
               Debet
             </Button>
           </div>
+
+          <Button
+            className="order-1 sm:order-2"
+            onClick={() => setIsDialogOpen(true)}
+          >
+            Tambah Transaksi
+          </Button>
         </div>
       </div>
 
@@ -599,16 +613,7 @@ function TransactionPageContent() {
                     Rp {transaction.amount.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    {(() => {
-                      const category = categories.find(
-                        (cat) => cat.$id === transaction.category?.id,
-                      );
-                      return (
-                        category?.name ||
-                        transaction.category?.name ||
-                        "Uncategorized"
-                      );
-                    })()}
+                    {transaction.category?.name || "Uncategorized"}
                   </TableCell>
                   <TableCell>
                     {transaction.image && (
